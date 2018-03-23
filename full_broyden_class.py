@@ -701,6 +701,7 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 
 	global gamma
 	global g
+	global phi
 
 	k = 0
 	#-------- main loop ----------
