@@ -469,8 +469,8 @@ def form_M0(new_s,new_y):
 	beta = - phi / (new_y.T @ new_s)
 	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) ) \
 															/ (new_y.T @ new_s)
-	M = np.array([alfa, beta],
-				 [beta, deta]) 
+	M = np.array([[alfa, beta],
+				  [beta, deta]]) 
 
 
 def update_M(new_s,new_y):
