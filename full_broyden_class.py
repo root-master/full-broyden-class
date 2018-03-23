@@ -494,6 +494,8 @@ def update_M(new_s,new_y):
 					[alfa*peta.T,			alfa,		beta],
 					[beta*peta.T,			beta,		deta]]) 
 
+	print(M.shape)
+
 
 def dict_of_weight_matrices_to_single_linear_vec(x_dict):
 	x_vec = np.array([])
