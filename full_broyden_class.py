@@ -476,17 +476,18 @@ def form_M0(new_s,new_y):
 def update_M(new_s,new_y):
 	global M
 	global phi
+	global Psi
 	global gamma
 
 	alfa = - (1 - phi) / (gamma * new_s.T @ new_s)
 	beta = - phi / (new_y.T @ new_s)
 	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) )\
 													 	/ (new_y.T @ new_s)
-	peta = M @ Psi.T @ new_s
+	peta = M @ Psi.T @ new_s.reshape(-1,1)
 
 	M = np.block([	[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
-					[alfa*peta.T,	np.array([[alfa]]),		np.array([[beta]])],
-					[beta*peta.T,	np.array([[beta]]),		np.array([[deta]])]]) 
+					[alfa*peta.T,			alfa,		beta],
+					[beta*peta.T,			beta,		deta]]) 
 
 
 def dict_of_weight_matrices_to_single_linear_vec(x_dict):
