@@ -475,6 +475,9 @@ def form_M0(new_s,new_y):
 
 def update_M(new_s,new_y):
 	global M
+	global phi
+	global gamma
+	
 	alfa = - (1 - phi) / (gamma * new_s.T @ new_s)
 	beta = - phi / (new_y.T @ new_s)
 	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) )\
