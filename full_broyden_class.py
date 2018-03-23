@@ -296,15 +296,19 @@ def phi_bar_prime_func(sigma):
 
 def solve_newton_equation_to_find_sigma(delta):
 	# tolerance
-	tol = 1E-4
+	tol = 1E-2
 	if phi_bar_func( max(0,-lambda_min), delta) < 0:
 		sigma_hat = max( abs( g_ll ) / delta - Lambda_1 )
 		sigma_hat = max(sigma_hat , (g_NL_norm / delta - gamma) ) 
 		sigma = max( 0, sigma_hat)
+		counter = 0
 		while( abs( phi_bar_func(sigma,delta) ) > tol ):
 			phi_bar = phi_bar_func(sigma,delta)
 			phi_bar_prime = phi_bar_prime_func(sigma)
 			sigma = sigma - phi_bar / phi_bar_prime
+			counter += 1
+			if counter > 100:
+				print('had to break newton solver')
 		sigma_star = sigma
 	elif lambda_min < 0:
 		sigma_star = - lambda_min
