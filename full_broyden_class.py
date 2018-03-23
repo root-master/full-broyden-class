@@ -298,7 +298,7 @@ def solve_newton_equation_to_find_sigma(delta):
 	# tolerance
 	tol = 1E-2
 	if phi_bar_func( max(0,-lambda_min), delta) < 0:
-		sigma_hat = max( abs( g_ll ) / delta - Lambda_1 )
+		sigma_hat = np.max( abs( g_ll ) / delta - Lambda_1 )
 		sigma_hat = max(sigma_hat , (g_NL_norm / delta - gamma) ) 
 		sigma = max( 0, sigma_hat)
 		counter = 0
@@ -307,8 +307,9 @@ def solve_newton_equation_to_find_sigma(delta):
 			phi_bar_prime = phi_bar_prime_func(sigma)
 			sigma = sigma - phi_bar / phi_bar_prime
 			counter += 1
-			if counter > 100:
+			if counter > 1000:
 				print('had to break newton solver')
+				break
 		sigma_star = sigma
 	elif lambda_min < 0:
 		sigma_star = - lambda_min
