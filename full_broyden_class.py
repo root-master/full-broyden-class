@@ -481,9 +481,9 @@ def update_M(new_s,new_y):
 													 	/ (new_y.T @ new_s)
 	peta = M @ Psi.T @ new_s
 
-	M = - inv( np.block([[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
-						 [alfa*peta.T,			alfa,		beta],
-						 [beta*peta.T,			beta,		deta]]) )
+	M = np.block([	[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
+					[alfa*peta.T,			alfa,		beta],
+					[beta*peta.T,			beta,		deta]]) 
 
 
 def dict_of_weight_matrices_to_single_linear_vec(x_dict):
