@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.linalg import inv, qr, eig, norm
+from numpy.linalg import inv, qr, eig, norm, pinv
 import math
 from math import isclose, sqrt
 #from tqdm import tqdm
@@ -11,7 +11,8 @@ import argparse
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--storage', '-m', default=10, help='The Memory Storage')
-parser.add_argument('--mini_batch','-minibatch', default=1000,help='minibatch size')
+parser.add_argument('--mini_batch','-minibatch', default=1000,
+												help='minibatch size')
 parser.add_argument('--num_batch_in_data', '-num-batch',default=5,
         							help='number of batches with overlap')
 parser.add_argument('--method', '-method',default='trust-region',
@@ -19,7 +20,7 @@ parser.add_argument('--method', '-method',default='trust-region',
 parser.add_argument(
         '--whole_gradient','-use-whole-data', action='store_true',default=False,
         help='Compute the gradient using all data')
-parser.add_argument('--max_iter', '-maxiter', default=200, help='max iterations')
+parser.add_argument('--max_iter', '-maxiter', default=200,help='max iterations')
 
 args = parser.parse_args()
 
@@ -56,19 +57,24 @@ y_validation = data.validation.labels
 X_train_multi = []
 y_train_multi = []
 ###############################################################################
-######################## LBFGS PARAMS #########################################
+######################## FULL BROYDEN CLASS MATRICES ##########################
 ###############################################################################
 
 S = np.array([[]])
 Y = np.array([[]])
+Psi = np.array([[]])
+M = np.array([[]])
+
+phi = -1
+phi_vec = []
 gamma = 1
 
-alpha = 1
 # GLOBAL VARIABLES - MATRICES
 P_ll = np.array([[]]) # P_parallel 
 g_ll = np.array([[]]) # g_Parallel
 g_NL_norm = 0
 Lambda_1 = np.array([[]])
+lambda_min = 0
 
 g = np.array([])
 ###############################################################################
@@ -264,17 +270,18 @@ def backtracking_line_search(sess,g):
 		alpha = alpha * rho_ls
 	return alpha*p
 
-def quad_model():
-	pass
-
 def phi_bar_func(sigma,delta):
-	# phi(sigma) = 1 / v(sigma) - 1 / delta	
+	
+	if np.isclose( -Lambda_1, sigma ).any():
+		phi_bar = - 1 / delta
+		return phi_bar
+
 	u = sum( (g_ll ** 2) / ((Lambda_1 + sigma) ** 2) ) + \
 									(g_NL_norm ** 2) / ( (gamma + sigma) ** 2)
 	v = sqrt(u) 
 
-	phi = 1 / v - 1 / delta
-	return phi
+	phi_bar = 1 / v - 1 / delta
+	return phi_bar
 
 def phi_bar_prime_func(sigma):
 	u = sum( g_ll ** 2 / (Lambda_1 + sigma) ** 2 ) + \
@@ -290,122 +297,33 @@ def phi_bar_prime_func(sigma):
 def solve_newton_equation_to_find_sigma(delta):
 	# tolerance
 	tol = 1E-4
-	sigma = max( 0, -Lambda_1[1] )
-	if phi_bar_func(sigma,delta) < 0:
+	if phi_bar_func( max(0,-lambda_min), delta) < 0:
 		sigma_hat = max( abs( g_ll ) / delta - Lambda_1 )
+		sigma_hat = max(sigma_hat , (g_NL_norm / delta - gamma) ) 
 		sigma = max( 0, sigma_hat)
 		while( abs( phi_bar_func(sigma,delta) ) > tol ):
 			phi_bar = phi_bar_func(sigma,delta)
 			phi_bar_prime = phi_bar_prime_func(sigma)
 			sigma = sigma - phi_bar / phi_bar_prime
 		sigma_star = sigma
-	elif Lambda_1[1] < 0:
-		sigma_star = - Lambda_1[1]
+	elif lambda_min < 0:
+		sigma_star = - lambda_min
 	else:
 		sigma_star = 0
 
 	return sigma_star 
 
-def lbfgs_line_search_subproblem_solver(sess, g):
-	# dimension of w
-	n = sum(n_W.values())
-
-	Psi = np.concatenate( (gamma*S, Y) ,axis=1)
-	
-	S_T_Y = S.T @ Y
-	L = np.tril(S_T_Y,k=-1)
-	U = np.tril(S_T_Y.T,k=-1).T
-	D = np.diag( np.diag(S_T_Y) )
-
-	M = - inv( np.block([ 	[gamma * S.T @ S ,	L],
-							[     L.T,		   -D] 
-			]) )
-
-	Q, R = qr(Psi, mode='reduced')
-	eigen_values, eigen_vectors = eig( R @ M @ R.T )
-
-	# sorted eigen values
-	idx = eigen_values.argsort()
-	eigen_values_sorted = eigen_values[idx]
-	eigen_vectors_sorted = eigen_vectors[:,idx]
-
-	Lambda_hat = eigen_values_sorted
-	V = eigen_vectors_sorted
-
-	global P_ll
-	global g_ll
-	global g_NL_norm
-	global Lambda_1
-
-	Lambda_1 = gamma + Lambda_hat
-	#Lambda_2 = gamma * np.ones( n-len(Lambda_hat) )
-	#B_diag = np.concatenate( (Lambda_1, Lambda_2),axis=0 )
-
-
-	P_ll = Psi @ inv(R) @ V # P_parallel 
-	g_ll = P_ll.T @ g	# g_Parallel
-	g_NL_norm = sqrt ( abs( norm(g) ** 2 - norm(g_ll) ** 2 ) )
-
-	p = - 1 / gamma * \
-			( g - Psi @ inv( gamma * inv(M) + Psi.T @ Psi ) @ (Psi.T @ g) )
-
-	alpha = satisfy_wolfe_condition(sess,p)
-
-	return alpha * p
-
-
-def satisfy_wolfe_condition(sess, p):
-	alpha = 1
-	rho_ls = 0.9
-	c1 = 1E-4
-	c2 = 0.9
-	WOLFE_COND_1 = False
-	WOLFE_COND_2 = False
-	while not ( WOLFE_COND_1 and WOLFE_COND_2): 
-		new_f = eval_aux_loss(sess,alpha*p)
-		old_f = eval_loss(sess)
-		lhs = new_f
-		rhs = old_f + c1 * alpha * p @ g
-		WOLFE_COND_1 = lhs <= rhs
-		if WOLFE_COND_1:
-			print('WOLFE_COND_1 SATISFIED')
-		else:
-			print('WOLFE_COND_1 NOT SATISFIED')
-
-		new_g = eval_aux_gradient_vec(sess)
-		lhs = new_g @ p
-		rhs = c2 * g @ p
-		WOLFE_COND_2 = lhs >= rhs
-		if WOLFE_COND_2:
-			print('WOLFE_COND_2 SATISFIED')
-		else:
-			print('WOLFE_COND_2 NOT SATISFIED')
-
-		if WOLFE_COND_1 and WOLFE_COND_2:
-			print('WOLFE CONDITIONS SATISFIED')
-			print('alpha = {0:.4f}' .format(alpha))
-		
-		if alpha < 0.1:
-			print('WARNING! Wolfe Condition did not satisfy')
-			break
-		alpha = alpha * rho_ls
-	return alpha
-
-
-def lbfgs_trust_region_subproblem_solver(delta, g):
+def trust_region_subproblem_solver(delta, g):
 	# size of w = g.size
 	n = sum(n_W.values())
 
+	global Psi
 	Psi = np.concatenate( (gamma*S, Y) ,axis=1)
 	
 	S_T_Y = S.T @ Y
 	L = np.tril(S_T_Y,k=-1)
 	U = np.tril(S_T_Y.T,k=-1).T
 	D = np.diag( np.diag(S_T_Y) )
-
-	M = - inv( np.block([ 	[gamma * S.T @ S ,	L],
-							[     L.T,		   -D] 
-			]) )
 
 	Q, R = qr(Psi, mode='reduced')
 	eigen_values, eigen_vectors = eig( R @ M @ R.T )
@@ -424,25 +342,66 @@ def lbfgs_trust_region_subproblem_solver(delta, g):
 	global Lambda_1
 
 	Lambda_1 = gamma + Lambda_hat
-	#Lambda_2 = gamma * np.ones( n-len(Lambda_hat) )
-	#B_diag = np.concatenate( (Lambda_1, Lambda_2),axis=0 )
 
+	global lambda_min
+	lambda_min = min( Lambda_1.min(), gamma )
 
 	P_ll = Psi @ inv(R) @ V # P_parallel 
 	g_ll = P_ll.T @ g	# g_Parallel
 	g_NL_norm = sqrt ( abs( norm(g) ** 2 - norm(g_ll) ** 2 ) )
 
 	sigma = 0
-	phi = phi_bar_func(sigma,delta)
 
-	if phi >= 0:
+	if lambda_min > 0 and phi_bar_func(0,delta) >= 0:
 		sigma_star = 0
 		tau_star = gamma
+		# Equation (11) of SR1 paper
+		p_star = - 1 / tau_star * \
+			( g - Psi @ inv( tau_star * inv(M) + Psi.T @ Psi ) @ (Psi.T @ g) )
+	elif lambda_min <= 0 and phi_bar_func(-lambda_min, delta) >= 0:
+		sigma_star = -lambda_min
+		# Equation (13) of SR1 paper
+		if ~isclose(sigma_star, -gamma):
+			p_star = - Psi @ inv(R) @ U * pinv( np.diag(Lambda_1 + sigma_star) ) @ g_ll - \
+					1 / ( gamma + sigma_star) * ( g - ( Psi @ inv(R) ) @ inv(R).T @ ( Psi.T @ g ) )
+		else:
+			p_star = - Psi @ inv(R) @ U * inv( np.diag(Lambda_1 + sigma_star) ) @ g_ll
+		###############???????????????????#########################
+		# so-called hard-case
+		if lambda_min < 0:
+			# Equation (13) of SR1 paper
+			if ~isclose(sigma_star, -gamma):
+				p_star_hat = - Psi @ inv(R) @ U * pinv( np.diag(Lambda_1 + sigma_star) ) @ g_ll - \
+						1 / ( gamma + sigma_star) * ( g - ( Psi @ inv(R) ) @ inv(R).T @ ( Psi.T @ g ) )
+			else:
+				p_star_hat = - Psi @ inv(R) @ U * inv( np.diag(Lambda_1 + sigma_star) ) @ g_ll
+			# Equation (14) of SR1 paper
+			# check if lambda_min is Lambda_1[0]
+			if isclose( lambda_min, Lambda_1.min()):
+				u_min = P_ll[:,0].reshape(-1,1)
+			else:
+				for j in range(Lambda_1.size+2):
+					e = np.zeros((n,1))
+					e[j,0] = 1.0
+					u_min = e - P_ll @ P_ll.T @ e
+					if ~isclose( norm(u_min), 0.0):
+						break
+			# find alpha in Eq (14)
+			# solve a * alpha^2 + b * alpha + c = 0  
+			a = norm(u_min) ** 2
+			b = 2 * norm(u_min) * norm(p_star_hat)
+			c = norm(p_star_hat) - delta ** 2
+			
+			alpha_1 = -b + sqrt(b ** 2 - 4 * a * c) / (2 * a)
+			alpha_2 = -b - sqrt(b ** 2 - 4 * a * c) / (2 * a)
+			alpha = alpha_1
+			
+			p_star = p_star_hat + alpha * u_min 
 	else:
 		sigma_star = solve_newton_equation_to_find_sigma(delta)
-		tau_star = gamma + sigma_star
-
-	p_star = - 1 / tau_star * \
+		tau_star = sigma_star + gamma
+		# Equation (11) of SR1 paper
+		p_star = - 1 / tau_star * \
 			( g - Psi @ inv( tau_star * inv(M) + Psi.T @ Psi ) @ (Psi.T @ g) )
 
 	return p_star
@@ -503,6 +462,28 @@ def update_S_Y(new_s_val,new_y_val):
 	S = Stmp
 	Y = Ytmp
 	return 
+
+def form_M0(new_s,new_y):
+	global M
+	alfa = - (1 - phi) / (gamma * new_s.T @ new_s)
+	beta = - phi / (new_y.T @ new_s)
+	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) ) \
+															/ (new_y.T @ new_s)
+	M = np.array([alfa, beta],
+				 [beta, deta]) 
+
+
+def update_M(new_s,new_y):
+	global M
+	alfa = - (1 - phi) / (gamma * new_s.T @ new_s)
+	beta = - phi / (new_y.T @ new_s)
+	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) )\
+													 	/ (new_y.T @ new_s)
+	peta = M @ Psi.T @ new_s
+
+	M = - inv( np.block([[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
+						 [alfa*peta.T,			alfa,		beta],
+						 [beta*peta.T,			beta,		deta]]) )
 
 
 def dict_of_weight_matrices_to_single_linear_vec(x_dict):
@@ -706,63 +687,7 @@ def set_multi_batch(num_batch_in_data, iteration):
 	return
 
 
-def lbfgs_line_search_algorithm(sess,max_num_iter=max_num_iter):
-	tolerance = 1E-5
-
-	global gamma
-	global g
-
-	k = 0
-	#-------- main loop ----------
-	while(True):
-		print('-'*60)
-		print('iteration: {}' .format(k))
-
-		set_multi_batch(num_batch_in_data, k)
-		save_print_training_results(sess)
-
-		g = eval_gradient_vec(sess)	
-		norm_g = norm(g)
-		print('norm of g = {0:.4f}' .format(norm_g))
-		if norm_g < tolerance:
-			print('-'*60)
-			print('gradient vanished')
-			print('convergence necessary but not sufficient condition') 
-			print('--BREAK -- the trust region loop!')
-			print('-'*60)
-			break
-
-		if k >= max_num_iter:
-			print('reached to the max num iteration -- BREAK')
-			break	
-		
-		if k == 0:
-			#p = backtracking_line_search(sess,g)
-			p = -g
-			alpha = satisfy_wolfe_condition(sess, p)
-			p = alpha*p
-		else:
-			p = lbfgs_line_search_subproblem_solver(sess, g)
-
-		new_loss = eval_aux_loss(sess,p) 
-		# we should call this function everytime before 
-		# evaluation of aux gradient			
-		new_y = eval_y(sess)
-		new_s = p
-		update_S_Y(new_s,new_y)
-		gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-		print('gamma = {0:.4f}' .format(gamma))
-		update_weights(sess,p)
-		print('weights are updated')
-
-		global iter_num
-		iter_num = k
-				
-		k += 1
-	return
-
-
-def lbfgs_trust_region_algorithm(sess,max_num_iter=max_num_iter):
+def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 	#--------- LOOP PARAMS ------------
 	delta_hat = 3 # upper bound for trust region radius
 	#max_num_iter = 1000 # max bunmber of trust region iterations
@@ -803,23 +728,33 @@ def lbfgs_trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			break	
 		
 		if new_iteration_number == 0:
-			p = backtracking_line_search(sess,g)
-			
+			p = backtracking_line_search(sess,g)			
 			# we should call this function everytime before 
 			# evaluation of aux gradient
 			new_loss = eval_aux_loss(sess,p) 
 			new_y = eval_y(sess)
 			new_s = p
-			update_S_Y(new_s,new_y)
+
 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
 			print('initial gamma = {0:.4f}' .format(gamma))
+
+			# compute the critical phi_SR1
+			phi_SR1 = (new_s.T@new_y) / ( new_s.T@new_y - gamma*new_s.T@new_s )
+
+			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+				phi = phi / 2
+
+			form_M0(new_s,new_y)
+
+			update_S_Y(new_s,new_y)
+
 			new_iteration = True
 			new_iteration_number += 1
 			update_weights(sess,p)
 			print('weights are updated')
 			continue
 		
-		p = lbfgs_trust_region_subproblem_solver(delta[k], g)
+		p = trust_region_subproblem_solver(delta[k], g)
 		
 		rho[k] = eval_reduction_ratio(sess, g, p)
 		if rho[k] < 1/4:
@@ -835,11 +770,20 @@ def lbfgs_trust_region_algorithm(sess,max_num_iter=max_num_iter):
 		if rho[k] > eta:
 			new_y = eval_y(sess)
 			new_s = p
-			update_S_Y(new_s,new_y)
+
 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
 			print('gamma = {0:.4f}' .format(gamma))
 			if gamma < 0 or isclose(gamma,0):
 				print('WARNING! -- gamma is not stable')
+
+			# compute the critical phi_SR1
+			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
+			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
+			
+			# update M
+			update_M(new_s,new_y)
+
+			update_S_Y(new_s,new_y)
 			new_iteration = True
 			new_iteration_number += 1
 
@@ -854,19 +798,16 @@ def lbfgs_trust_region_algorithm(sess,max_num_iter=max_num_iter):
 		iter_num = k
 
 		k += 1
+		phi = phi * 1 / k ** 2
+		while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+			phi = phi / 2
 	return
 
 start = time.time()
 
 with tf.Session() as sess:
 	sess.run(init)
-
-	if method == 'trust-region':
-		lbfgs_trust_region_algorithm(sess)
-	elif method == 'line-search':
-		lbfgs_line_search_algorithm(sess)
-	else:
-		print('Error! No proper method is defined')
+	trust_region_algorithm(sess)
 
 end = time.time()
 
@@ -876,11 +817,11 @@ each_iteration_avg_time = loop_time / (iter_num+1)
 
 import pickle
 
-result_file_path = './results/results_experiment_FEB_23_' + str(method) + '_m_' \
+result_file_path = './results/results_experiment_MARCH' + str(method) + '_m_'\
 							+ str(m) + '_n_' + str(num_batch_in_data) + '.pkl'
 if use_whole_data:
-	result_file_path = './results/results_experiment_FEB_23_' + str(method) + '_m_' \
-							+ str(m) + '_n_2' + '.pkl'
+	result_file_path = './results/results_experiment_MARCH' + str(method) + \
+	'_m_' + str(m) + '_n_2' + '.pkl'
 # Saving the objects:
 with open(result_file_path, 'wb') as f: 
 	pickle.dump([loss_train_results, loss_validation_results, 
