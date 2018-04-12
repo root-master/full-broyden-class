@@ -332,6 +332,9 @@ def trust_region_subproblem_solver(delta, g):
 
 	Q, R = qr(Psi, mode='reduced')
 	eigen_values, eigen_vectors = eig( R @ M @ R.T )
+	# make sure eigen values are real
+	eigen_values = eigen_values.real
+	eigen_vectors = eigen_vectors.real
 
 	# sorted eigen values
 	idx = eigen_values.argsort()
@@ -468,33 +471,34 @@ def update_S_Y(new_s_val,new_y_val):
 	Y = Ytmp
 	return 
 
-def form_M0(new_s,new_y):
-	global M
-	alfa = - (1 - phi) / (gamma * new_s.T @ new_s)
-	beta = - phi / (new_y.T @ new_s)
-	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) ) \
-															/ (new_y.T @ new_s)
-	M = np.array([[alfa, beta],
-				  [beta, deta]]) 
 
-
-def update_M(new_s,new_y):
+def update_M():
 	global M
 	global phi
-	global Psi
 	global gamma
 
-	alfa = - (1 - phi) / (gamma * new_s.T @ new_s)
-	beta = - phi / (new_y.T @ new_s)
-	deta = ( 1 + phi * (gamma * new_s.T @ new_s ) / (new_y.T @ new_s) )\
-													 	/ (new_y.T @ new_s)
-	peta = M @ Psi.T @ new_s.reshape(-1,1)
+	num_columns_S = S.shape[1]
 
-	M = np.block([	[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
-					[alfa*peta.T,			alfa,		beta],
-					[beta*peta.T,			beta,		deta]]) 
+	for k in range(num_columns_S):		
+		sk = S[:,k]
+		yk = Y[:,k]
+		alfa = - (1 - phi) / (gamma * sk.T @ sk)
+		beta = - phi / (yk.T @ sk)
+		deta = ( 1 + phi * (gamma * sk.T @ sk )/(yk.T @ sk) )/ (yk.T @ sk)
 
-	print(M.shape)
+		if k == 0:
+			M = np.array([[alfa, beta],
+						  [beta, deta]]) 
+		else:
+			Psi_old = np.concatenate( (gamma*S[:,:k], Y[:,:k]) , axis=1)
+			peta = M @ Psi_old.T @ sk.reshape(-1,1)
+
+			M = np.block([	[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
+							[alfa*peta.T,			alfa,		beta],
+							[beta*peta.T,			beta,		deta]]) 
+
+	# make sure M is symmetric
+	M = (M + M.T) / 2
 
 
 def dict_of_weight_matrices_to_single_linear_vec(x_dict):
@@ -757,9 +761,9 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
 				phi = phi / 2
 
-			form_M0(new_s,new_y)
-
 			update_S_Y(new_s,new_y)
+
+			update_M()
 
 			new_iteration = True
 			new_iteration_number += 1
@@ -793,10 +797,8 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
 			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
 			
-			# update M
-			update_M(new_s,new_y)
-
 			update_S_Y(new_s,new_y)
+			update_M()
 			new_iteration = True
 			new_iteration_number += 1
 
