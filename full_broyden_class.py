@@ -66,7 +66,7 @@ Psi = np.array([[]])
 M = np.array([[]])
 
 phi = -10
-phi_vec = np.array([])
+phi_vec = np.array([phi])
 gamma = 1
 
 # GLOBAL VARIABLES - MATRICES
