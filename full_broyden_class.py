@@ -501,7 +501,7 @@ def update_M():
 			yk = Y[:,k]
 			Psi_old = np.concatenate( (gamma*S[:,:k], Y[:,:k]) , axis=1)
 			peta = M @ Psi_old.T @ sk.reshape(-1,1)
-			s_T_B_s = gamma * sk.T @ sk + (sk.reshape(-1,1) @ Psi_old) @ peta
+			s_T_B_s = gamma * sk.T @ sk + (sk.reshape(-1,1).T @ Psi_old) @ peta
 			alfa = - (1 - fi) / (s_T_B_s)
 			beta = - fi / (yk.T @ sk)
 			deta = ( 1 + fi * (s_T_B_s)/(yk.T @ sk) ) / (yk.T @ sk)
