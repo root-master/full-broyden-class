@@ -65,8 +65,8 @@ Y = np.array([[]])
 Psi = np.array([[]])
 M = np.array([[]])
 
-phi = -1
-phi_vec = []
+phi = -10
+phi_vec = np.array([])
 gamma = 1
 
 # GLOBAL VARIABLES - MATRICES
@@ -471,28 +471,40 @@ def update_S_Y(new_s_val,new_y_val):
 	Y = Ytmp
 	return 
 
+def update_phi_vec(phi):
+	global phi_vec
+	if phi_vec.size < m:
+		phi_vec = np.append( phi_vec, phi )
+	else:
+		phi_vec = np.delete( phi_vec, 0 ) 
+		phi_vec = np.append( phi_vec, phi )
 
 def update_M():
 	global M
-	global phi
 	global gamma
-
 	num_columns_S = S.shape[1]
 
 	for k in range(num_columns_S):		
-		sk = S[:,k]
-		yk = Y[:,k]
-		alfa = - (1 - phi) / (gamma * sk.T @ sk)
-		beta = - phi / (yk.T @ sk)
-		deta = ( 1 + phi * (gamma * sk.T @ sk )/(yk.T @ sk) )/ (yk.T @ sk)
 
 		if k == 0:
+			fi = phi_vec[0] 
+			s0 = S[:,0]
+			y0 = Y[:,0]
+			alfa = - (1 - fi) / (gamma * s0.T @ s0)
+			beta = - fi / (y0.T @ s0)
+			deta = ( 1 + fi * (gamma * s0.T @ s0 )/(y0.T @ s0) ) / (y0.T @ s0)
 			M = np.array([[alfa, beta],
 						  [beta, deta]]) 
 		else:
+			fi = phi_vec[k]
+			sk = S[:,k]
+			yk = Y[:,k]
 			Psi_old = np.concatenate( (gamma*S[:,:k], Y[:,:k]) , axis=1)
 			peta = M @ Psi_old.T @ sk.reshape(-1,1)
-
+			s_T_B_s = gamma * sk.T @ sk + (sk.reshape(-1,1) @ Psi_old) @ peta
+			alfa = - (1 - fi) / (s_T_B_s)
+			beta = - fi / (yk.T @ sk)
+			deta = ( 1 + fi * (s_T_B_s)/(yk.T @ sk) ) / (yk.T @ sk)
 			M = np.block([	[M+alfa*peta@peta.T,	alfa*peta,	beta*peta ],
 							[alfa*peta.T,			alfa,		beta],
 							[beta*peta.T,			beta,		deta]]) 
@@ -765,6 +777,8 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 
 			update_M()
 
+			update_phi_vec(phi)
+
 			new_iteration = True
 			new_iteration_number += 1
 			update_weights(sess,p)
@@ -802,6 +816,13 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			new_iteration = True
 			new_iteration_number += 1
 
+			phi = phi * 1 / new_iteration_number ** 2
+			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+				phi = phi / 2
+
+			update_phi_vec(phi)
+
+
 			update_weights(sess,p)
 			print('weights are updated')
 		else:
@@ -810,12 +831,9 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			print('No update in this iteration')
 
 		global iter_num
+		k += 1
 		iter_num = k
 
-		k += 1
-		phi = phi * 1 / k ** 2
-		while isclose( phi, phi_SR1, rel_tol=1E-4 ):
-			phi = phi / 2
 	return
 
 start = time.time()
