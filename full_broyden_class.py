@@ -67,7 +67,10 @@ M = np.array([[]])
 
 phi = -10
 phi_vec = np.array([phi])
+gamma_max = 500
 gamma = 1
+
+delta_vec = np.zeros(max_num_iter+1)
 
 # GLOBAL VARIABLES - MATRICES
 P_ll = np.array([[]]) # P_parallel 
@@ -331,7 +334,28 @@ def trust_region_subproblem_solver(delta, g):
 	D = np.diag( np.diag(S_T_Y) )
 
 	Q, R = qr(Psi, mode='reduced')
-	eigen_values, eigen_vectors = eig( R @ M @ R.T )
+
+	# check if Psi is full rank or not
+	if np.isclose(np.diag(R),0).any():
+		rank_deficieny = True
+		# find zeros of diagonal of R
+		rank_deficient_idx = np.where( np.isclose(np.diag(R),0))[0]
+		# deleting the rows of R with a 0 diagonal entry (r * k+1)
+		R_cross = np.delete( R, obj=rank_deficient_idx, axis=0 )
+		# deleting the columsn of Psi with a 0 diagonal entry on R (n * r)
+		Psi_cross = np.delete( Psi, obj=rank_deficient_idx, axis=1 )
+		# deleting the rows and columns of R with a 0 diagonal entry (r * r)
+		R_cross_cross = np.delete( R_cross, obj=rank_deficient_idx, axis=1 )
+		# (n * r)
+		Q_hat = Psi_cross @ inv(R_cross_cross)
+		# (r * r)
+		R_M_R_T = R_cross @ M @ R_cross.T
+	else:
+		rank_deficieny = False
+		R_M_R_T = R @ M @ R.T
+
+
+	eigen_values, eigen_vectors = eig( R_M_R_T )
 	# make sure eigen values are real
 	eigen_values = eigen_values.real
 	eigen_vectors = eigen_vectors.real
@@ -354,7 +378,10 @@ def trust_region_subproblem_solver(delta, g):
 	global lambda_min
 	lambda_min = min( Lambda_1.min(), gamma )
 
-	P_ll = Psi @ inv(R) @ V # P_parallel 
+	if rank_deficieny:
+		P_ll = Psi_cross @ inv(R_cross_cross) @ V
+	else:
+		P_ll = Psi @ inv(R) @ V # P_parallel 
 	g_ll = P_ll.T @ g	# g_Parallel
 	g_NL_norm = sqrt ( abs( norm(g) ** 2 - norm(g_ll) ** 2 ) )
 
@@ -368,21 +395,24 @@ def trust_region_subproblem_solver(delta, g):
 			( g - Psi @ inv( tau_star * inv(M) + Psi.T @ Psi ) @ (Psi.T @ g) )
 	elif lambda_min <= 0 and phi_bar_func(-lambda_min, delta) >= 0:
 		sigma_star = -lambda_min
-		# Equation (13) of SR1 paper
-		if ~isclose(sigma_star, -gamma):
-			p_star = - Psi @ inv(R) @ U * pinv( np.diag(Lambda_1 + sigma_star) ) @ g_ll - \
-					1 / ( gamma + sigma_star) * ( g - ( Psi @ inv(R) ) @ inv(R).T @ ( Psi.T @ g ) )
+		if rank_deficieny:
+			if ~isclose(sigma_star, -gamma):
+				p_star = - Psi_cross @ inv(R_cross_cross) @ U * pinv( np.diag(Lambda_1 + sigma_star) ) @ g_ll - \
+						1 / ( gamma + sigma_star) * ( g - ( Psi_cross @ inv(R_cross_cross) ) @ inv(R_cross_cross).T @ ( Psi_cross.T @ g ) )
+			else:
+				p_star = - Psi_cross @ inv(R_cross_cross) @ U * inv( np.diag(Lambda_1 + sigma_star) ) @ g_ll
+
 		else:
-			p_star = - Psi @ inv(R) @ U * inv( np.diag(Lambda_1 + sigma_star) ) @ g_ll
+			# Equation (13) of SR1 paper
+			if ~isclose(sigma_star, -gamma):
+				p_star = - Psi @ inv(R) @ U * pinv( np.diag(Lambda_1 + sigma_star) ) @ g_ll - \
+						1 / ( gamma + sigma_star) * ( g - ( Psi @ inv(R) ) @ inv(R).T @ ( Psi.T @ g ) )
+			else:
+				p_star = - Psi @ inv(R) @ U * inv( np.diag(Lambda_1 + sigma_star) ) @ g_ll
 		###############???????????????????#########################
 		# so-called hard-case
 		if lambda_min < 0:
-			# Equation (13) of SR1 paper
-			if ~isclose(sigma_star, -gamma):
-				p_star_hat = - Psi @ inv(R) @ U * pinv( np.diag(Lambda_1 + sigma_star) ) @ g_ll - \
-						1 / ( gamma + sigma_star) * ( g - ( Psi @ inv(R) ) @ inv(R).T @ ( Psi.T @ g ) )
-			else:
-				p_star_hat = - Psi @ inv(R) @ U * inv( np.diag(Lambda_1 + sigma_star) ) @ g_ll
+			p_star_hat = p_star.copy()
 			# Equation (14) of SR1 paper
 			# check if lambda_min is Lambda_1[0]
 			if isclose( lambda_min, Lambda_1.min()):
@@ -718,8 +748,8 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 	#--------- LOOP PARAMS ------------
 	delta_hat = 3 # upper bound for trust region radius
 	#max_num_iter = 1000 # max bunmber of trust region iterations
-	delta = np.zeros(max_num_iter+1)
-	delta[0] = delta_hat * 0.75
+	global delta_vec
+	delta_vec[0] = delta_hat * 0.75
 	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
 	eta = 1/4 * 0.9 # eta \in [0,1/4)
 	new_iteration = True
@@ -765,6 +795,7 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			new_s = p
 
 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+			gamma = max(abs(gamma), gamma_max)
 			print('initial gamma = {0:.4f}' .format(gamma))
 
 			# compute the critical phi_SR1
@@ -785,27 +816,28 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			print('weights are updated')
 			continue
 		
-		p = trust_region_subproblem_solver(delta[k], g)
+		p = trust_region_subproblem_solver(delta_vec[k], g)
 		
 		rho[k] = eval_reduction_ratio(sess, g, p)
 		if rho[k] < 1/4:
-			delta[k+1] = 1/4 * delta[k]
+			delta_vec[k+1] = 1/4 * delta_vec[k]
 			print('shrinking trust region radius')
 		else:
 			if rho[k] > 3/4 and isclose( norm(p), delta[k] ):
-				delta[k+1] = min(2*delta[k], delta_hat)
+				delta_vec[k+1] = min(2*delta_vec[k], delta_hat)
 				print('expanding trust region radius')
 			else:
-				delta[k+1] = delta[k]
+				delta_vec[k+1] = delta_vec[k]
 
 		if rho[k] > eta:
 			new_y = eval_y(sess)
 			new_s = p
 
 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+			gamma = max(abs(gamma), gamma_max)
 			print('gamma = {0:.4f}' .format(gamma))
-			if gamma < 0 or isclose(gamma,0):
-				print('WARNING! -- gamma is not stable')
+			# if gamma < 0 or isclose(gamma,0):
+			# 	print('WARNING! -- gamma is not stable')
 
 			# compute the critical phi_SR1
 			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
