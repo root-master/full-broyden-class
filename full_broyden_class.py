@@ -795,7 +795,7 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			new_s = p
 
 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-			gamma = max(abs(gamma), gamma_max)
+			gamma = min(abs(gamma), gamma_max)
 			print('initial gamma = {0:.4f}' .format(gamma))
 
 			# compute the critical phi_SR1
@@ -834,7 +834,7 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			new_s = p
 
 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-			gamma = max(abs(gamma), gamma_max)
+			gamma = min(abs(gamma), gamma_max)
 			print('gamma = {0:.4f}' .format(gamma))
 			# if gamma < 0 or isclose(gamma,0):
 			# 	print('WARNING! -- gamma is not stable')
