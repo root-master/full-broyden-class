@@ -823,7 +823,7 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			delta_vec[k+1] = 1/4 * delta_vec[k]
 			print('shrinking trust region radius')
 		else:
-			if rho[k] > 3/4 and isclose( norm(p), delta[k] ):
+			if rho[k] > 3/4 and isclose( norm(p), delta_vec[k] ):
 				delta_vec[k+1] = min(2*delta_vec[k], delta_hat)
 				print('expanding trust region radius')
 			else:
