@@ -863,9 +863,10 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			print('No update in this iteration')
 
 		global iter_num
+		print('delta = {}' .format(delta_vec[k]))
 		k += 1
 		iter_num = k
-		print('delta = {0:.4f}' .format(delta_vec[k]))
+
 
 	return
 
