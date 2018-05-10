@@ -991,7 +991,7 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			delta_vec[k+1] = 0.5 * delta_vec[k]
 
 		global iter_num
-		print('delta = {}' .format(delta_vec[k]))
+		print('delta = {}' .format(delta_vec[k+1]))
 		k += 1
 		iter_num = k
 	return
