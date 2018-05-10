@@ -747,14 +747,11 @@ def set_multi_batch(num_batch_in_data, iteration):
 def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 	#--------- LOOP PARAMS ------------
 	delta_hat = 3 # upper bound for trust region radius
-	#max_num_iter = 1000 # max bunmber of trust region iterations
 	global delta_vec
 	delta_vec[0] = delta_hat * 0.75
 	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
 	# eta value in Book's trust-region algorithm 4.1 
-	# eta = 1/4 * 0.9 # eta \in [0,1/4)
-	# eta in 6.2
-	eta = 0.001 * 0.9
+	eta = 1/4 * 0.9 # eta \in [0,1/4)
 	new_iteration = True
 	new_iteration_number = 0
 	tolerance = 1E-5
@@ -873,13 +870,142 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 
 # todo: IMPLEMENT algorithm 6.2 of BOOK
 def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
-	pass
+	#--------- LOOP PARAMS ------------
+	delta_hat = 3 # upper bound for trust region radius
+	global delta_vec
+	delta_vec[0] = delta_hat
+	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
+	# eta value in Book's trust-region algorithm 6.2 
+	eta = 0.9 * 0.001 # eta \in (0,0.001)
+	new_iteration = True
+	new_iteration_number = 0
+	tolerance = 1E-5
+
+	global gamma
+	global g
+	global phi
+	global M
+
+	k = 0
+	#-------- main loop ----------
+	while(True):
+		print('-'*60)
+		print('iteration: {}' .format(k))
+
+		if new_iteration:
+			set_multi_batch(num_batch_in_data, new_iteration_number)
+			save_print_training_results(sess)
+
+		g = eval_gradient_vec(sess)	
+		print('norm of g = {0:.4f}' .format(norm_g))
+
+		if k > max_num_iter:
+			print('-'*60)
+			print('reached to max iteration')
+			break
+
+		if norm(g) < tolerance:
+			print('-'*60)
+			print('gradient is smaller than tolerance')
+			break
+
+		if new_iteration_number == 0:
+			p = backtracking_line_search(sess,g)			
+			# we should call this function everytime before 
+			# evaluation of aux gradient
+			new_loss = eval_aux_loss(sess,p) 
+			new_y = eval_y(sess)
+			new_s = p
+
+			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+			gamma = min(abs(gamma), gamma_max)
+			print('initial gamma = {0:.4f}' .format(gamma))
+
+			# compute the critical phi_SR1
+			phi_SR1 = (new_s.T@new_y) / ( new_s.T@new_y - gamma*new_s.T@new_s )
+
+			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+				phi = phi / 2
+
+			update_S_Y(new_s,new_y)
+
+			update_M()
+
+			update_phi_vec(phi)
+
+			new_iteration = True
+			new_iteration_number += 1
+			update_weights(sess,p)
+			print('weights are updated')
+			continue
+		
+		p = trust_region_subproblem_solver(delta_vec[k], g)
+		
+		rho[k] = eval_reduction_ratio(sess, g, p)
+
+		if rho[k] > eta:
+			new_y = eval_y(sess)
+			new_s = p
+
+			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+			gamma = min(abs(gamma), gamma_max)
+			print('gamma = {0:.4f}' .format(gamma))
+			# if gamma < 0 or isclose(gamma,0):
+			# 	print('WARNING! -- gamma is not stable')
+
+			# compute the critical phi_SR1
+			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
+			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
+			
+			update_S_Y(new_s,new_y)
+			update_M()
+			new_iteration = True
+			new_iteration_number += 1
+
+			phi = phi * 1 / new_iteration_number ** 2
+			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+				phi = phi / 2
+
+			update_phi_vec(phi)
+
+
+			update_weights(sess,p)
+			print('weights are updated')
+		else:
+			new_iteration = False
+			print('-'*30)
+			print('No update in this iteration')
+
+
+		if rho[k] > 3/4:
+			if norm(new_s) < 0.8 * delta_vec[k]:
+				delta_vec[k+1] = delta_vec[k]
+			else:
+				print('expanding trust region radius')
+				delta_vec[k+1] = 2 * delta_vec[k]
+		elif rho[k] > 0.1 and rho[k] < 3/4:
+			delta_vec[k+1] = delta_vec[k]
+		else:
+			print('shrinking trust region radius')
+			delta_vec[k+1] = 0.5 * delta_vec[k]
+
+		global iter_num
+		print('delta = {}' .format(delta_vec[k]))
+		k += 1
+		iter_num = k
+	return
+	
+
+	
+		k += 1
+	return
 
 start = time.time()
 
 with tf.Session() as sess:
 	sess.run(init)
-	trust_region_algorithm(sess)
+	# trust_region_algorithm(sess)
+	trust_region_algorithm_6_2(sess)
 
 end = time.time()
 
