@@ -65,9 +65,9 @@ Y = np.array([[]])
 Psi = np.array([[]])
 M = np.array([[]])
 
-phi = +10
+phi = 1
 phi_vec = np.array([phi])
-gamma_max = 500
+gamma_max = 100
 gamma = 1
 
 delta_vec = np.zeros(max_num_iter+1)
@@ -752,8 +752,9 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 	delta_vec[0] = delta_hat * 0.75
 	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
 	# eta value in Book's trust-region algorithm 4.1 
-	eta = 1/4 * 0.9 # eta \in [0,1/4)
-	
+	# eta = 1/4 * 0.9 # eta \in [0,1/4)
+	# eta in 6.2
+	eta = 0.001 * 0.9
 	new_iteration = True
 	new_iteration_number = 0
 	tolerance = 1E-5
