@@ -994,12 +994,6 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 		k += 1
 		iter_num = k
 	return
-	
-
-	
-		k += 1
-	return
-
 start = time.time()
 
 with tf.Session() as sess:
