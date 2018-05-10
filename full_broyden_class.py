@@ -896,7 +896,8 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			set_multi_batch(num_batch_in_data, new_iteration_number)
 			save_print_training_results(sess)
 
-		g = eval_gradient_vec(sess)	
+		g = eval_gradient_vec(sess)
+		norm_g = norm(g)	
 		print('norm of g = {0:.4f}' .format(norm_g))
 
 		if k > max_num_iter:
@@ -904,7 +905,7 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			print('reached to max iteration')
 			break
 
-		if norm(g) < tolerance:
+		if norm_g < tolerance:
 			print('-'*60)
 			print('gradient is smaller than tolerance')
 			break
