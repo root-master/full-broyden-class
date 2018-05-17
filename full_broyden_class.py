@@ -977,6 +977,7 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			new_iteration = False
 			# add s and y to the collection even if no update in wk
 			update_S_Y(new_s,new_y)
+			update_phi_vec(phi)
 			update_M()
 
 			print('-'*30)
