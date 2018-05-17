@@ -848,7 +848,8 @@ def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 			new_iteration = True
 			new_iteration_number += 1
 
-			phi = phi * 1 / new_iteration_number ** 2
+			# change phi every iteration even if not new iteration
+			phi = phi * 1 / k
 			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
 				phi = phi / 2
 
@@ -974,6 +975,10 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			print('weights are updated')
 		else:
 			new_iteration = False
+			# add s and y to the collection even if no update in wk
+			update_S_Y(new_s,new_y)
+			update_M()
+
 			print('-'*30)
 			print('No update in this iteration')
 
