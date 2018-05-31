@@ -65,7 +65,7 @@ Y = np.array([[]])
 Psi = np.array([[]])
 M = np.array([[]])
 
-phi = 1
+phi = 0
 phi_vec = np.array([phi])
 gamma_max = 100
 gamma = 1
