@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.linalg import inv, qr, eig, norm, pinv
+from numpy.linalg import inv, qr, eig, norm, pinv, eigvals
 import math
 from math import isclose, sqrt
 #from tqdm import tqdm
@@ -799,7 +799,7 @@ def compute_gamma(new_y,new_s):
 	D = np.diag( np.diag(S_T_Y) )
 	A = L + L.T + D
 	B = S.T @ S
-	eig_val_AB, eig_vec_AB = eig(A,b=B)
+	eig_vals_AB = eigvals(A, B)
 	lambda_min_AB = min(eig_val_AB)
 	if (gamma >= lambda_min_AB):
 		if lambda_min > 0:
