@@ -20,6 +20,9 @@ parser.add_argument('--method', '-method',default='trust-region',
 parser.add_argument(
         '--whole_gradient','-use-whole-data', action='store_true',default=False,
         help='Compute the gradient using all data')
+parser.add_argument(
+        '--use_overlap','-use-overlap', action='store_true',default=True,
+        help='Compute y using overlap of multibatches')
 parser.add_argument('--max_iter', '-maxiter', default=200,help='max iterations')
 
 args = parser.parse_args()
@@ -28,6 +31,7 @@ minibatch = int(args.mini_batch)
 m = int(args.storage)
 num_batch_in_data = int(args.num_batch_in_data)
 use_whole_data = args.whole_gradient
+use_overlap = args.use_overlap
 # if minibatch==500: ==> num_batch_in_data in [3, 6, 9, 12, 18, 36, 54, 108]
 # if minibatch==1000 ==> num_batch_in_data in [3, 6, 9, 18, 54]
 # if minibatch ==540 ==> num_batch_in_data in [5, 10, 20, 25, 50, 100]
@@ -56,6 +60,10 @@ y_validation = data.validation.labels
 
 X_train_multi = []
 y_train_multi = []
+X_half_batch_1 = []
+X_half_batch_2 = []
+y_half_batch_1 = []
+y_half_batch_2 = []
 ###############################################################################
 ######################## FULL BROYDEN CLASS MATRICES ##########################
 ###############################################################################
@@ -65,7 +73,7 @@ Y = np.array([[]])
 Psi = np.array([[]])
 M = np.array([[]])
 
-phi = 0
+phi = 1
 phi_vec = np.array([phi])
 gamma_max = 100
 gamma = 1
@@ -468,6 +476,12 @@ def eval_y(sess):
 	new_y = new_g - old_g
 	return new_y
 
+def eval_y_overlap(sess):
+	new_g = eval_aux_gradient_vec_overlap(sess)
+	old_g = eval_gradient_vec_overlap(sess)
+	new_y = new_g - old_g
+	return new_y
+
 def enqueue(Z,new_val):
 	if Z.size == 0:
 		Z = new_val.reshape(-1,1)
@@ -675,6 +689,20 @@ def eval_aux_gradient_vec(sess):
 	aux_g_vec = dict_of_weight_matrices_to_single_linear_vec(aux_g_dict)
 	return aux_g_vec	
 
+def eval_aux_gradient_vec_overlap(sess):
+	# assuming that eval_aux_loss is being called before this function call
+	aux_g_dict = compute_multibatch_gradient(sess,aux_grad_w,
+												X_half_batch_2,y_half_batch_2)
+	aux_g_vec = dict_of_weight_matrices_to_single_linear_vec(aux_g_dict)
+	return aux_g_vec
+def eval_gradient_vec_overlap(sess):
+	"""returns gradient, here only for mode='robust-multi-batch' 
+	I should modify to consider all other cases"""
+	g_dict = compute_multibatch_gradient(sess,grad_w_tf,
+												X_half_batch_2,y_half_batch_2)
+	g_vec = dict_of_weight_matrices_to_single_linear_vec(g_dict)
+	return g_vec	
+
 ###############################################################################
 ######################## TRUST REGION ALGORITHM ###############################
 ###############################################################################
@@ -720,10 +748,18 @@ def set_multi_batch(num_batch_in_data, iteration):
 
 	global X_train_multi
 	global y_train_multi
+	global X_half_batch_1 # prev overlap
+	global X_half_batch_2 # current overlap
+	global y_half_batch_1
+	global y_half_batch_2
 
 	if use_whole_data:
 		X_train_multi = X_train
 		y_train_multi = y_train
+		X_half_batch_1 = X_train
+		y_half_batch_1 = y_train
+		y_half_batch_2 = X_train
+		y_half_batch_2 = y_train
 		return
 
 	set_1, set_2 = permutation(num_batch_in_data,iteration)
@@ -743,138 +779,162 @@ def set_multi_batch(num_batch_in_data, iteration):
 
 	return
 
-
-def trust_region_algorithm(sess,max_num_iter=max_num_iter):
-	#--------- LOOP PARAMS ------------
-	delta_hat = 3 # upper bound for trust region radius
-	global delta_vec
-	delta_vec[0] = delta_hat * 0.75
-	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
-	# eta value in Book's trust-region algorithm 4.1 
-	eta = 1/4 * 0.9 # eta \in [0,1/4)
-	new_iteration = True
-	new_iteration_number = 0
-	tolerance = 1E-5
-
+def compute_gamma(new_y,new_s):
 	global gamma
-	global g
-	global phi
-	global M
+	global S
+	global Y
 
-	k = 0
-	#-------- main loop ----------
-	while(True):
-		print('-'*60)
-		print('iteration: {}' .format(k))
+	guess_1 = (new_y.T @ new_y) / (new_s.T @ new_y)
+	
+	if S.size == 0:
+		gamma = guess_1
+	
+	# otherwise solve general eigen-value problem
+	S_T_Y = S.T @ Y
+	L = np.tril(S_T_Y,k=-1)
+	U = np.tril(S_T_Y.T,k=-1).T
+	D = np.diag( np.diag(S_T_Y) )
+	A = S.T @ (L + L.T + D) @ S
+	B = S.T @ S
+	eig_val_AB, eig_vec_AB = eig(A,B)
+	lambda_min_AB = min(eig_val_AB)
+	if lambda_min > 0:
+		gamma = 0.9 * lambda_min
+	else:
+		# we can do a better job than this tho
+		gamma = min(abs(gamma), gamma_max)
+
+# def trust_region_algorithm(sess,max_num_iter=max_num_iter):
+# 	#--------- LOOP PARAMS ------------
+# 	delta_hat = 3 # upper bound for trust region radius
+# 	global delta_vec
+# 	delta_vec[0] = delta_hat * 0.75
+# 	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
+# 	# eta value in Book's trust-region algorithm 4.1 
+# 	eta = 1/4 * 0.9 # eta \in [0,1/4)
+# 	new_iteration = True
+# 	new_iteration_number = 0
+# 	tolerance = 1E-5
+
+# 	global gamma
+# 	global g
+# 	global phi
+# 	global M
+
+# 	k = 0
+# 	#-------- main loop ----------
+# 	while(True):
+# 		print('-'*60)
+# 		print('iteration: {}' .format(k))
 		
-		if new_iteration:
-			set_multi_batch(num_batch_in_data, new_iteration_number)
-			save_print_training_results(sess)
+# 		if new_iteration:
+# 			set_multi_batch(num_batch_in_data, new_iteration_number)
+# 			save_print_training_results(sess)
 
-		g = eval_gradient_vec(sess)	
-		norm_g = norm(g)
-		print('norm of g = {0:.4f}' .format(norm_g))
-		if norm_g < tolerance:
-			print('-'*60)
-			print('gradient vanished')
-			print('convergence necessary but not sufficient condition') 
-			print('--BREAK -- the trust region loop!')
-			print('-'*60)
-			break
+# 		g = eval_gradient_vec(sess)	
+# 		norm_g = norm(g)
+# 		print('norm of g = {0:.4f}' .format(norm_g))
+# 		if norm_g < tolerance:
+# 			print('-'*60)
+# 			print('gradient vanished')
+# 			print('convergence necessary but not sufficient condition') 
+# 			print('--BREAK -- the trust region loop!')
+# 			print('-'*60)
+# 			break
 
-		if k >= max_num_iter:
-			print('reached to the max num iteration -- BREAK')
-			break	
+# 		if k >= max_num_iter:
+# 			print('reached to the max num iteration -- BREAK')
+# 			break	
 		
-		if new_iteration_number == 0:
-			p = backtracking_line_search(sess,g)			
-			# we should call this function everytime before 
-			# evaluation of aux gradient
-			new_loss = eval_aux_loss(sess,p) 
-			new_y = eval_y(sess)
-			new_s = p
+# 		if new_iteration_number == 0:
+# 			p = backtracking_line_search(sess,g)			
+# 			# we should call this function everytime before 
+# 			# evaluation of aux gradient
+# 			new_loss = eval_aux_loss(sess,p) 
+# 			new_y = eval_y(sess)
+# 			new_s = p
 
-			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-			gamma = min(abs(gamma), gamma_max)
-			print('initial gamma = {0:.4f}' .format(gamma))
+# 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+# 			gamma = min(abs(gamma), gamma_max)
+# 			print('initial gamma = {0:.4f}' .format(gamma))
 
-			# compute the critical phi_SR1
-			phi_SR1 = (new_s.T@new_y) / ( new_s.T@new_y - gamma*new_s.T@new_s )
+# 			# compute the critical phi_SR1
+# 			phi_SR1 = (new_s.T@new_y) / ( new_s.T@new_y - gamma*new_s.T@new_s )
 
-			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
-				phi = phi / 2
+# 			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+# 				phi = phi / 2
 
-			update_S_Y(new_s,new_y)
+# 			update_S_Y(new_s,new_y)
 
-			update_M()
+# 			update_M()
 
-			update_phi_vec(phi)
+# 			update_phi_vec(phi)
 
-			new_iteration = True
-			new_iteration_number += 1
-			update_weights(sess,p)
-			print('weights are updated')
-			continue
+# 			new_iteration = True
+# 			new_iteration_number += 1
+# 			update_weights(sess,p)
+# 			print('weights are updated')
+# 			continue
 		
-		p = trust_region_subproblem_solver(delta_vec[k], g)
+# 		p = trust_region_subproblem_solver(delta_vec[k], g)
 		
-		rho[k] = eval_reduction_ratio(sess, g, p)
-		if rho[k] < 1/4:
-			delta_vec[k+1] = 1/4 * delta_vec[k]
-			print('shrinking trust region radius')
-		else:
-			if rho[k] > 3/4 and isclose( norm(p), delta_vec[k] ):
-				delta_vec[k+1] = min(2*delta_vec[k], delta_hat)
-				print('expanding trust region radius')
-			else:
-				delta_vec[k+1] = delta_vec[k]
+# 		rho[k] = eval_reduction_ratio(sess, g, p)
+# 		if rho[k] < 1/4:
+# 			delta_vec[k+1] = 1/4 * delta_vec[k]
+# 			print('shrinking trust region radius')
+# 		else:
+# 			if rho[k] > 3/4 and isclose( norm(p), delta_vec[k] ):
+# 				delta_vec[k+1] = min(2*delta_vec[k], delta_hat)
+# 				print('expanding trust region radius')
+# 			else:
+# 				delta_vec[k+1] = delta_vec[k]
 
-		if rho[k] > eta:
-			new_y = eval_y(sess)
-			new_s = p
+# 		if rho[k] > eta:
+# 			new_y = eval_y(sess)
+# 			new_s = p
 
-			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-			gamma = min(abs(gamma), gamma_max)
-			print('gamma = {0:.4f}' .format(gamma))
-			# if gamma < 0 or isclose(gamma,0):
-			# 	print('WARNING! -- gamma is not stable')
+# 			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+# 			gamma = min(abs(gamma), gamma_max)
+# 			print('gamma = {0:.4f}' .format(gamma))
+# 			# if gamma < 0 or isclose(gamma,0):
+# 			# 	print('WARNING! -- gamma is not stable')
 
-			# compute the critical phi_SR1
-			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
-			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
+# 			# compute the critical phi_SR1
+# 			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
+# 			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
 			
-			update_S_Y(new_s,new_y)
-			update_M()
-			new_iteration = True
-			new_iteration_number += 1
+# 			update_S_Y(new_s,new_y)
+# 			update_M()
+# 			new_iteration = True
+# 			new_iteration_number += 1
 
-			# change phi every iteration even if not new iteration
-			phi = phi * 1 / k
-			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
-				phi = phi / 2
+# 			# change phi every iteration even if not new iteration
+# 			phi = phi * 1 / k
+# 			while isclose( phi, phi_SR1, rel_tol=1E-4 ):
+# 				phi = phi / 2
 
-			update_phi_vec(phi)
+# 			update_phi_vec(phi)
 
 
-			update_weights(sess,p)
-			print('weights are updated')
-		else:
-			new_iteration = False
-			print('-'*30)
-			print('No update in this iteration')
+# 			update_weights(sess,p)
+# 			print('weights are updated')
+# 		else:
+# 			new_iteration = False
+# 			print('-'*30)
+# 			print('No update in this iteration')
 
-		global iter_num
-		print('delta = {}' .format(delta_vec[k]))
-		k += 1
-		iter_num = k
-	return
+# 		global iter_num
+# 		print('delta = {}' .format(delta_vec[k]))
+# 		k += 1
+# 		iter_num = k
+# 	return
 
 # todo: IMPLEMENT algorithm 6.2 of BOOK
-def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
+def trust_region_algo rithm_6_2(sess,max_num_iter=max_num_iter):
 	#--------- LOOP PARAMS ------------
 	delta_hat = 3 # upper bound for trust region radius
 	global delta_vec
-	delta_vec[0] = delta_hat
+	delta_vec[0] = 0.75 * delta_hat
 	rho = np.zeros(max_num_iter) # true reduction / predicted reduction ratio
 	# eta value in Book's trust-region algorithm 6.2 
 	eta = 0.9 * 0.001 # eta \in (0,0.001)
@@ -916,11 +976,17 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			# we should call this function everytime before 
 			# evaluation of aux gradient
 			new_loss = eval_aux_loss(sess,p) 
-			new_y = eval_y(sess)
+			if use_overlap:
+				new_y = eval_y_overlap(sess)
+			else:
+				new_y = eval_y(sess)
 			new_s = p
 
-			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-			gamma = min(abs(gamma), gamma_max)
+			compute_gamma(new_s,new_y)
+			
+			# gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+			# gamma = min(abs(gamma), gamma_max)
+
 			print('initial gamma = {0:.4f}' .format(gamma))
 
 			# compute the critical phi_SR1
@@ -945,12 +1011,21 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 		
 		rho[k] = eval_reduction_ratio(sess, g, p)
 
-		if rho[k] > eta:
+		if use_overlap:
+			new_y = eval_y_overlap(sess)
+		else:
 			new_y = eval_y(sess)
-			new_s = p
+		new_s = p
+		compute_gamma(new_y,new_s)
+		print('gamma = {0:.4f}' .format(gamma))
+		update_S_Y(new_s,new_y)
+		update_M()
 
-			gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
-			gamma = min(abs(gamma), gamma_max)
+
+		if rho[k] > eta:
+			# gamma = compute_gamma(new_y,new_s)
+			# gamma = (new_y.T @ new_y) / (new_s.T @ new_y)
+			# gamma = min(abs(gamma), gamma_max)
 			print('gamma = {0:.4f}' .format(gamma))
 			# if gamma < 0 or isclose(gamma,0):
 			# 	print('WARNING! -- gamma is not stable')
@@ -959,8 +1034,6 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
 			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
 			
-			update_S_Y(new_s,new_y)
-			update_M()
 			new_iteration = True
 			new_iteration_number += 1
 
@@ -976,9 +1049,7 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 		else:
 			new_iteration = False
 			# add s and y to the collection even if no update in wk
-			update_S_Y(new_s,new_y)
 			update_phi_vec(phi)
-			update_M()
 
 			print('-'*30)
 			print('No update in this iteration')
