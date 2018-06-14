@@ -799,7 +799,7 @@ def compute_gamma(new_y,new_s):
 	D = np.diag( np.diag(S_T_Y) )
 	A = L + L.T + D
 	B = S.T @ S
-	eig_val_AB, eig_vec_AB = eig(A,B)
+	eig_val_AB, eig_vec_AB = eig(A,b=B)
 	lambda_min_AB = min(eig_val_AB)
 	if (gamma >= lambda_min_AB):
 		if lambda_min > 0:
