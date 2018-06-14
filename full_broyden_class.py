@@ -789,7 +789,7 @@ def compute_gamma(new_y,new_s):
 	guess_1 = (new_y.T @ new_y) / (new_s.T @ new_y)
 	
 	if S.size == 0:
-		gamma = guess_1
+		gamma = min(abs(guess_1),gamma_max)
 		return
 	
 	# otherwise solve general eigen-value problem
@@ -797,15 +797,17 @@ def compute_gamma(new_y,new_s):
 	L = np.tril(S_T_Y,k=-1)
 	U = np.tril(S_T_Y.T,k=-1).T
 	D = np.diag( np.diag(S_T_Y) )
-	A = S.T @ (L + L.T + D) @ S
+	A = L + L.T + D
 	B = S.T @ S
 	eig_val_AB, eig_vec_AB = eig(A,B)
 	lambda_min_AB = min(eig_val_AB)
-	if lambda_min > 0:
-		gamma = 0.9 * lambda_min
+	if (gamma >= lambda_min_AB):
+		if lambda_min > 0:
+			gamma = max(0.9 * lambda_min, 1E-3)
 	else:
-		# we can do a better job than this tho
-		gamma = min(abs(gamma), gamma_max)
+		if guess_1 > 0:
+			# we can do a better job than this tho
+			gamma = min(guess_1, gamma_max)
 
 # def trust_region_algorithm(sess,max_num_iter=max_num_iter):
 # 	#--------- LOOP PARAMS ------------
