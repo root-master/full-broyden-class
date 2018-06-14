@@ -334,13 +334,15 @@ def solve_newton_equation_to_find_sigma(delta):
 
 	return sigma_star 
 
+
+def form_Psi():
+	global Psi
+	Psi = np.concatenate( (gamma*S, Y) ,axis=1)
+
 def trust_region_subproblem_solver(delta, g):
 	# size of w = g.size
 	n = sum(n_W.values())
-
-	global Psi
-	Psi = np.concatenate( (gamma*S, Y) ,axis=1)
-	
+	form_Psi()
 	S_T_Y = S.T @ Y
 	L = np.tril(S_T_Y,k=-1)
 	U = np.tril(S_T_Y.T,k=-1).T
@@ -1038,6 +1040,7 @@ def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 			# 	print('WARNING! -- gamma is not stable')
 
 			# compute the critical phi_SR1
+			form_Psi()
 			sT_B_s = gamma * new_s.T @ new_s + new_s.T @ Psi @ M @ (Psi.T@new_s)
 			phi_SR1 = (new_s.T@new_y) / ( new_s.T @ new_y - sT_B_s )
 			
