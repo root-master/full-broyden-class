@@ -780,7 +780,6 @@ def set_multi_batch(num_batch_in_data, iteration):
 	y_half_batch_2 = y_train[start_index_2:end_index_2]
 	y_train_multi = np.concatenate((y_half_batch_1,y_half_batch_2))
 
-	return
 
 def compute_gamma(new_y,new_s):
 	global gamma
