@@ -790,6 +790,7 @@ def compute_gamma(new_y,new_s):
 	
 	if S.size == 0:
 		gamma = guess_1
+		return
 	
 	# otherwise solve general eigen-value problem
 	S_T_Y = S.T @ Y
