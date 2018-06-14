@@ -25,7 +25,10 @@ parser.add_argument(
         help='Compute y using overlap of multibatches')
 parser.add_argument('--max_iter', '-maxiter', default=200,help='max iterations')
 
+
+# python full_broyden_class.py -use-whole-data -m=20 
 args = parser.parse_args()
+
 
 minibatch = int(args.mini_batch)
 m = int(args.storage)
@@ -930,7 +933,7 @@ def compute_gamma(new_y,new_s):
 # 	return
 
 # todo: IMPLEMENT algorithm 6.2 of BOOK
-def trust_region_algo rithm_6_2(sess,max_num_iter=max_num_iter):
+def trust_region_algorithm_6_2(sess,max_num_iter=max_num_iter):
 	#--------- LOOP PARAMS ------------
 	delta_hat = 3 # upper bound for trust region radius
 	global delta_vec
