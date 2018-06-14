@@ -760,8 +760,8 @@ def set_multi_batch(num_batch_in_data, iteration):
 		X_train_multi = X_train
 		y_train_multi = y_train
 		X_half_batch_1 = X_train
+		X_half_batch_2 = X_train
 		y_half_batch_1 = y_train
-		y_half_batch_2 = X_train
 		y_half_batch_2 = y_train
 		return
 
