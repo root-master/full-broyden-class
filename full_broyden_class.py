@@ -800,7 +800,7 @@ def compute_gamma(new_y,new_s):
 	A = L + L.T + D
 	B = S.T @ S
 	eig_vals_AB = eigvals(A, B)
-	lambda_min_AB = min(eig_val_AB)
+	lambda_min_AB = min(eig_vals_AB)
 	if (gamma >= lambda_min_AB):
 		if lambda_min > 0:
 			gamma = max(0.9 * lambda_min, 1E-3)
