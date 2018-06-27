@@ -86,7 +86,8 @@ class FullBroydenClass:
 		self.gamma = 1 # B0 = gamma * I
 		self.gamma_vec = np.array([])
 		
-		self.delta = 3 # trust region initial radius
+		self.delta_hat = 3
+		self.delta = self.delta_hat * 0.75 # trust region initial radius
 		self.delta_vec = np.array([])
 
 		self.P_ll = np.array([[]]) # P_parallel 
@@ -627,33 +628,47 @@ class FullBroydenClass:
 		new_s = p
 		if new_s.T @ new_y <= 0 and self.quasi_Newton_matrix == 'L_BFGS':
 			print('curvature condition did not satisfy for L_BFGS ==> danger zone') 
-			alpha = self.satisfy_curvature_condition(p)
-			# alpha = self.satisfy_wolfe_condition(p)
+			#alpha = self.satisfy_curvature_condition(p)
+			alpha = self.satisfy_wolfe_condition(p)
 			new_s = alpha * p
 			new_loss = self.model.eval_aux_loss(p_vec=alpha * p) 
 			new_y = self.model.eval_y(use_overlap=self.use_overlap)
 
-		self.update_S_Y(new_s,new_y)
-		self.update_M()
 		self.iter += 1
 
-		if rho > eta:			
+		if rho > eta:
 			self.model.update_weights(p_vec=p)
+			if new_s.T @ new_y > 0:
+				self.update_S_Y(new_s,new_y)
+				self.update_M()
 		else:
 			print('-'*30)
 			print('No update in this iteration')
 
-		if rho > 3/4:
-			if norm(new_s) < 0.8 * self.delta:
-				self.delta = self.delta
-			else:
-				print('expanding trust region radius')
-				self.delta = 2 * self.delta
-		elif rho > 0.1 and rho < 3/4:
-			self.delta = self.delta
-		else:
+		# strategy_1
+		if rho < 1/4:
+			self.delta = 1/4 * self.delta
 			print('shrinking trust region radius')
-			self.delta = 0.5 * self.delta
+		else:
+			if rho > 3/4 and isclose( norm(p), delta ):
+				self.delta = min(2*self.delta, self.delta_hat)
+				print('expanding trust region radius')
+			else:
+				self.delta = self.delta
+
+
+		# strategy_2
+		# if rho > 3/4:
+		# 	if norm(new_s) < 0.8 * self.delta:
+		# 		self.delta = self.delta
+		# 	else:
+		# 		print('expanding trust region radius')
+		# 		self.delta = 2 * self.delta
+		# elif rho > 0.1 and rho < 3/4:
+		# 	self.delta = self.delta
+		# else:
+		# 	print('shrinking trust region radius')
+		# 	self.delta = 0.5 * self.delta
 		return
 
 	def line_search_algorithm():

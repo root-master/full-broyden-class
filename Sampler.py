@@ -9,7 +9,8 @@ class Sampler():
 					Y=None,
 					use_overlap=True,
 					num_half_batch=4,
-					use_whole_data=False):
+					use_whole_data=False,
+					shuffle_each_epoch=False):
 		X, Y = shuffle(X, Y, random_state=0)
 		self.X = X
 		self.Y = Y
@@ -25,6 +26,7 @@ class Sampler():
 		self.sample_h = 0 # middle index of interval
 		self.sample_j = 0 # end index of interval
 		self.use_whole_data = use_whole_data
+		self.shuffle_each_epoch = shuffle_each_epoch
 
 	def overlapped_sample(self):
 		'''this is for sampling with overlap
@@ -70,7 +72,11 @@ class Sampler():
 	def shuffle_beginning_and_concat_to_end(self, X_prev, Y_prev):
 		'''shuffles the beginning protion of the data and concat to the 
 		last sample'''
-		X_after, Y_after = shuffle(X_prev, Y_prev,random_state=0)
+		if self.shuffle_each_epoch:
+			X_after, Y_after = shuffle(X_prev, Y_prev,random_state=0)
+		else:
+			X_after = X_prev
+			Y_after = Y_prev
 		self.X = np.concatenate( (self.X_sample, X_after) )
 		self.Y = np.concatenate( (self.Y_sample, Y_after) )
 
