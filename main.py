@@ -19,7 +19,7 @@ parser.add_argument(
         help='Compute y using overlap of multibatches')
 parser.add_argument('--max_iter', '-maxiter', default=200,help='max iterations')
 
-# python main.py -num-batch=10 -m=20 -use-overlap=False
+# python main.py -num-batch=10 -m=20 
 args = parser.parse_args()
 
 

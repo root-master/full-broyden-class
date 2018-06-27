@@ -606,11 +606,11 @@ class FullBroydenClass:
 			new_s = p
 			if new_s.T @ new_y <= 0 and self.quasi_Newton_matrix == 'L_BFGS':
 				print('curvature condition did not satisfy for L_BFGS ==> danger zone') 
-				alpha = self.satisfy_curvature_condition(p)
+				# alpha = self.satisfy_curvature_condition(p)
 				# alpha = self.satisfy_wolfe_condition(p)
-				new_s = alpha * p
-				new_loss = self.model.eval_aux_loss(p_vec=alpha * p) 
-				new_y = self.model.eval_y(use_overlap=self.use_overlap)
+				# new_s = alpha * p
+				# new_loss = self.model.eval_aux_loss(p_vec=alpha * p) 
+				# new_y = self.model.eval_y(use_overlap=self.use_overlap)
 
 			self.update_S_Y(new_s,new_y)
 			self.update_M()
@@ -637,9 +637,9 @@ class FullBroydenClass:
 
 		self.iter += 1
 
-		if new_s.T @ new_y > 0:
-			self.update_S_Y(new_s,new_y)
-			self.update_M()
+		# if new_s.T @ new_y > 0:
+		self.update_S_Y(new_s,new_y)
+		self.update_M()
 		
 		if rho > eta:
 			self.model.update_weights(p_vec=p)
