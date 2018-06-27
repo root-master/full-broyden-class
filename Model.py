@@ -42,8 +42,8 @@ class Model:
 		############################ y_ = f(x;w) ##############################
 		self.f = f
 		self.w_initializer = tf.contrib.layers.xavier_initializer()
-		self.x = tf.placeholder(tf.float32,shape=network_input_shape,name='x')					
-		self.y = tf.placeholder(tf.float32,shape=network_output_shape, name='y')
+		self.x = tf.placeholder(tf.float32, network_input_shape)					
+		self.y = tf.placeholder(tf.float32, network_output_shape)
 		
 		w = {}
 		for key, _ in weights_shape_dict.items():
