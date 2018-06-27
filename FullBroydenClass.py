@@ -508,11 +508,11 @@ class FullBroydenClass:
 		g_ll = P_ll.T @ g	# g_Parallel
 		g_NL_norm = sqrt ( abs( norm(g) ** 2 - norm(g_ll) ** 2 ) )
 
-		P_ll = self.P_ll
-		g_ll = self.g_ll
-		g_NL_norm = self.g_NL_norm
-		Lambda_1 = self.Lambda_1
-		lambda_min = self.lambda_min
+		self.P_ll = P_ll
+		self.g_ll = g_ll
+		self.g_NL_norm = g_NL_norm
+		self.Lambda_1 = Lambda_1
+		self.lambda_min = lambda_min
 
 		sigma = 0
 
