@@ -76,7 +76,7 @@ for k in range(max_iter):
 	if k == 0:
 		# print/save training loss, accuracy
 		print('-'*20,' initial values ','-'*20)
-		model.feed_data(X=X,Y=Y)
+		model.feed_data(X=X,Y=Y,XO=XO,YO=YO)
 		logger.eval_train_performance()
 		# print/save test loss, accuracy
 		model.feed_data(X=X_test,Y=Y_test)
