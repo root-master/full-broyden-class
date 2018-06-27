@@ -269,7 +269,7 @@ class Model:
 		# 	# Run the train_step ops to update the weights based on your accumulated gradients
 		# 	sess.run(train_step)
 
-	def eval_w_dict(sess):
+	def eval_w_dict(self):
 		w_dict = self.session.run(self.w)
 		w_vec = self.dict_of_weight_matrices_to_single_linear_vec(w_dict)
 		self.w_vec = w_vec
@@ -330,9 +330,6 @@ class Model:
 			feed_dict.update({self.update_w_placeholder[key]: w_dict[key]+p_dict[key] })
 		self.session.run(self.update_w, feed_dict=feed_dict)
 		print('weights are updated')
-
-m = Model()	
-
 
 
 
