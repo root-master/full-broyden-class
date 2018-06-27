@@ -357,9 +357,20 @@ class FullBroydenClass:
 		S = self.S
 		Y = self.Y
 		S_T_Y = S.T @ Y
+		S_T_S = S.T @ S
 		L = np.tril(S_T_Y,k=-1)
 		U = np.tril(S_T_Y.T,k=-1).T
 		D = np.diag( np.diag(S_T_Y) )
+
+		H = L + D + L.T
+		eigen_values_general_problem = eigvals(H, S_T_S)
+		eig_min = min(eigen_values_general_problem)
+		if eig_min < 0:
+			print('no need for safe gaurding')
+			gamma = self.find_gamma_common()
+			gamma = max( 1, gamma )
+		else:
+			gamma = 0.9 * eig_min
 
 	def find_gamma_L_SR1_general_eig():
 		pass		
@@ -387,8 +398,8 @@ class FullBroydenClass:
 				return alpha
 				break
 			s = alpha * p
-			new_f = model.eval_aux_loss(p_vec=alpha*p)
-			y = model.eval_aux_gradient_vec()
+			new_f = self.model.eval_aux_loss(p_vec=alpha*p)
+			y = self.model.eval_aux_gradient_vec()
 			BAD_COND = s.T @ y <= 0
 			alpha = 0.9 * alpha
 		print('curvature condition satisfied for alpha', alpha)
@@ -403,8 +414,8 @@ class FullBroydenClass:
 		WOLFE_COND_1 = False
 		WOLFE_COND_2 = False
 		while not ( WOLFE_COND_1 and WOLFE_COND_2): 
-			new_f = model.eval_aux_loss(p_vec=alpha*p)
-			old_f = model.eval_loss()
+			new_f = self.model.eval_aux_loss(p_vec=alpha*p)
+			old_f = self.model.eval_loss()
 			lhs = new_f
 			rhs = old_f + c1 * alpha * p @ g
 			WOLFE_COND_1 = lhs <= rhs
@@ -413,7 +424,7 @@ class FullBroydenClass:
 			else:
 				print('WOLFE_COND_1 NOT SATISFIED')
 
-			new_g = model.eval_aux_gradient_vec()
+			new_g = self.model.eval_aux_gradient_vec()
 			lhs = new_g @ p
 			rhs = c2 * g @ p
 			WOLFE_COND_2 = lhs >= rhs
@@ -566,7 +577,7 @@ class FullBroydenClass:
 		eta = 0.9 * 0.001 # eta \in (0,0.001)
 		tolerance = 1E-5
 
-		g = model.eval_gradient_vec()
+		g = self.model.eval_gradient_vec()
 		self.g = g
 		norm_g = norm(g)	
 		print('norm of g = {0:.4f}' .format(norm_g))
@@ -580,30 +591,30 @@ class FullBroydenClass:
 			p = self.backtracking_line_search()			
 			# we should call this function everytime before 
 			# evaluation of aux gradient
-			new_loss = model.eval_aux_loss(p_vec=p) 
-			new_y = model.eval_y(use_overlap=self.use_overlap)
+			new_loss = self.model.eval_aux_loss(p_vec=p) 
+			new_y = self.model.eval_y(use_overlap=self.use_overlap)
 			new_s = p
 			if new_s.T @ new_y <= 0 and self.quasi_Newton_matrix == 'L_BFGS':
 				print('curvature condition did not satisfy for L_BFGS ==> danger zone') 
 				alpha = self.satisfy_curvature_condition(p)
 				# alpha = self.satisfy_wolfe_condition(p)
 				new_s = alpha * p
-				new_loss = model.eval_aux_loss(p_vec=alpha * p) 
-				new_y = model.eval_y(use_overlap=self.use_overlap)
+				new_loss = self.model.eval_aux_loss(p_vec=alpha * p) 
+				new_y = self.model.eval_y(use_overlap=self.use_overlap)
 
 			self.update_S_Y(new_s,new_y)
 			self.update_M()
 
 			self.iter += 1
 			self.first_iteration = False
-			model.update_weights(p_vec=p)
+			self.model.update_weights(p_vec=p)
 			return
 		
 		gamma = self.find_gamma()
 		p = self.trust_region_subproblem_solver()		
 		rho = self.eval_reduction_ratio(p)
 
-		new_y = model.eval_y(use_overlap=self.use_overlap)
+		new_y = self.model.eval_y(use_overlap=self.use_overlap)
 		new_s = p
 		if new_s.T @ new_y <= 0 and self.quasi_Newton_matrix == 'L_BFGS':
 			print('s * y <= 0 ==> danger zone') 
@@ -612,7 +623,7 @@ class FullBroydenClass:
 		self.iter += 1
 
 		if rho > eta:			
-			model.update_weights(p_vec=p)
+			self.model.update_weights(p_vec=p)
 		else:
 			print('-'*30)
 			print('No update in this iteration')
