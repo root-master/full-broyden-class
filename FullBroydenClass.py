@@ -158,6 +158,7 @@ class FullBroydenClass:
 		g_ll = self.g_ll
 		Lambda_1 = self.Lambda_1
 		g_NL_norm = self.g_NL_norm
+		gamma = self.gamma
 
 		if np.isclose( -Lambda_1, sigma ).any():
 			phi_bar = - 1 / delta
