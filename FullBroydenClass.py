@@ -354,7 +354,7 @@ class FullBroydenClass:
 		self.gamma = gamma
 		return gamma
 
-	def find_gamma_L_BFGS_general_eig():
+	def find_gamma_L_BFGS_general_eig(self):
 		S = self.S
 		Y = self.Y
 		S_T_Y = S.T @ Y
@@ -374,7 +374,7 @@ class FullBroydenClass:
 			gamma = 0.9 * eig_min
 		self.gamma = gamma
 
-	def find_gamma_L_SR1_general_eig():
+	def find_gamma_L_SR1_general_eig(self):
 		pass		
 
 	def find_gamma(self):
