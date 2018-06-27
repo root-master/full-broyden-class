@@ -253,6 +253,7 @@ class FullBroydenClass:
 	def update_S_Y(self,new_s_val,new_y_val):
 		Stmp = self.S
 		Ytmp = self.Y
+		m = self.m
 		num_columns_S = Stmp.shape[1]
 		num_columns_Y = Stmp.shape[1]
 		assert num_columns_S is num_columns_Y, "dimention of S and Y doesn't match"
