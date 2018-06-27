@@ -584,7 +584,7 @@ class FullBroydenClass:
 
 	def trust_region_algorithm(self):
 		# eta value in Book's trust-region algorithm 6.2 
-		eta = 0.9 * 0.001 # eta \in (0,0.001)
+		eta = 0.9 * 1/4 # eta \in (0,0.001)
 		tolerance = 1E-5
 
 		g = self.model.eval_gradient_vec()
@@ -624,15 +624,16 @@ class FullBroydenClass:
 		p = self.trust_region_subproblem_solver()		
 		rho = self.eval_reduction_ratio(p)
 
+		new_loss = self.model.eval_aux_loss(p_vec=p) 
 		new_y = self.model.eval_y(use_overlap=self.use_overlap)
 		new_s = p
 		if new_s.T @ new_y <= 0 and self.quasi_Newton_matrix == 'L_BFGS':
 			print('curvature condition did not satisfy for L_BFGS ==> danger zone') 
 			#alpha = self.satisfy_curvature_condition(p)
-			alpha = self.satisfy_wolfe_condition(p)
-			new_s = alpha * p
-			new_loss = self.model.eval_aux_loss(p_vec=alpha * p) 
-			new_y = self.model.eval_y(use_overlap=self.use_overlap)
+			# alpha = self.satisfy_wolfe_condition(p)
+			# new_s = alpha * p
+			#new_loss = self.model.eval_aux_loss(p_vec=alpha * p) 
+			#new_y = self.model.eval_y(use_overlap=self.use_overlap)
 
 		self.iter += 1
 
