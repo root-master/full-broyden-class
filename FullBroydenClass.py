@@ -372,6 +372,7 @@ class FullBroydenClass:
 			gamma = max( 1, gamma )
 		else:
 			gamma = 0.9 * eig_min
+		self.gamma = gamma
 
 	def find_gamma_L_SR1_general_eig():
 		pass		
@@ -379,15 +380,19 @@ class FullBroydenClass:
 	def find_gamma(self):
 		if self.S.size == 0:
 			self.gamma = 1
+			print('gamma = ', gamma)
 			return self.gamma
 
 		if self.find_gamma_method == 'common':
 			gamma = self.find_gamma_common()
+			print('gamma = ', gamma)
 			return gamma
 		
 		if self.find_gamma_method == 'general-eig-problem':
 			if self.quasi_Newton_matrix == 'L_BFGS':
-				gamma= find_gamma_L_BFGS_general_eig()
+				gamma= self.find_gamma_L_BFGS_general_eig()
+				self.gamma = gamma
+				print('gamma = ', gamma)
 				return gamma
 
 	def satisfy_curvature_condition(self,p):
