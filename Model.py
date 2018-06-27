@@ -323,7 +323,7 @@ class Model:
 		return accuracy_val
 
 	def update_weights(self,p_vec=None):
-		w_dict = self.eval_w_dict(sess)
+		w_dict = self.eval_w_dict()
 		p_dict = self.linear_vec_to_dict_of_weight_matrices(p_vec)
 		feed_dict = {}
 		for key,_ in self.w.items():
