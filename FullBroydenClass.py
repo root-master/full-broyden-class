@@ -650,7 +650,7 @@ class FullBroydenClass:
 			self.delta = 1/4 * self.delta
 			print('shrinking trust region radius')
 		else:
-			if rho > 3/4 and isclose( norm(p), delta ):
+			if rho > 3/4 and isclose( norm(p), self.delta ):
 				self.delta = min(2*self.delta, self.delta_hat)
 				print('expanding trust region radius')
 			else:
