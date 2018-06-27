@@ -17,8 +17,8 @@ class Model:
 	"""
 	def __init__(self,
 				f = lenet5_model,
-				network_input_shape = (None,784),
-				network_output_shape = (None, 10),
+				network_input_shape = [None,784],
+				network_output_shape = [None, 10],
 				weights_shape_dict = dim_w,
 				**kwargs ):
 		"""
