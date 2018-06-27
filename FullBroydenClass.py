@@ -584,7 +584,7 @@ class FullBroydenClass:
 
 	def trust_region_algorithm(self):
 		# eta value in Book's trust-region algorithm 6.2 
-		eta = 0.9 * 1/4 # eta \in (0,0.001)
+		eta = 0.9 * 0.001 # eta \in (0,0.001)
 		tolerance = 1E-5
 
 		g = self.model.eval_gradient_vec()

@@ -17,6 +17,9 @@ parser.add_argument(
 parser.add_argument(
         '--use_overlap','-use-overlap', action='store_true',default=False,
         help='Compute y using overlap of multibatches')
+parser.add_argument(
+        '--shuffle_each_epoch','-shuffle-each-epoch', action='store_true',default=False,
+        help='Compute y using overlap of multibatches')
 parser.add_argument('--max_iter', '-maxiter', default=200,help='max iterations')
 
 # python main.py -num-batch=10 -m=20 
@@ -30,6 +33,7 @@ use_whole_data = args.whole_gradient
 use_overlap = args.use_overlap
 method = str(args.method)
 max_iter = int(args.max_iter)
+shuffle_each_epoch = args.shuffle_each_epoch
 
 import input_MNIST_data
 from Sampler import Sampler
@@ -48,7 +52,7 @@ Y_test = data.test.labels
 # create a shuffler and sampler instance
 sampler = Sampler(  X=X_train, Y=Y_train,
 					use_overlap=use_overlap, num_half_batch=num_half_batch,
-											use_whole_data=use_whole_data)
+		use_whole_data=use_whole_data,shuffle_each_epoch=shuffle_each_epoch)
 
 if use_whole_data: 
 	use_overlap = False
