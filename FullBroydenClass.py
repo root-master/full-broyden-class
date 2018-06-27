@@ -366,6 +366,7 @@ class FullBroydenClass:
 
 		H = L + D + L.T
 		eigen_values_general_problem = eigvals(H, S_T_S)
+		eigen_values_general_problem = eigen_values_general_problem.real
 		eig_min = min(eigen_values_general_problem)
 		if eig_min < 0:
 			print('no need for safe gaurding')
