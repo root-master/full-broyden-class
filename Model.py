@@ -315,7 +315,6 @@ class Model:
 			old_g = self.g # because we don't want to recompute this gradient
 		
 		new_y = new_g - old_g
-		self.y = new_y
 		return new_y
 
 	def eval_accuracy(self):
