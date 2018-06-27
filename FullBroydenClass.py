@@ -139,8 +139,8 @@ class FullBroydenClass:
 		p = -g
 
 		while not BLS_COND:
-			new_f = model.eval_aux_loss(p_vec=alpha*p)
-			old_f = model.eval_loss()
+			new_f = self.model.eval_aux_loss(p_vec=alpha*p)
+			old_f = self.model.eval_loss()
 			lhs = new_f
 			rhs = old_f + c1 * alpha * p @ g
 			BLS_COND = lhs <= rhs
