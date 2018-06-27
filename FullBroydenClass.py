@@ -373,6 +373,7 @@ class FullBroydenClass:
 		else:
 			gamma = 0.9 * eig_min
 		self.gamma = gamma
+		return gamma
 
 	def find_gamma_L_SR1_general_eig(self):
 		pass		
