@@ -90,10 +90,10 @@ for k in range(max_iter):
 
 	# print/save final training loss, accuracy
 	print('-'*20,' performance metrics ','-'*20)
-	model.feed_data(X=X,Y=Y)
+	model.feed_data(X=X,Y=Y,XO=XO,YO=YO)
 	logger.eval_train_performance()
 	# print/save final test loss, accuracy
-	model.feed_data(X=X_test,Y=Y_test)
+	model.feed_data(X=X_test,Y=Y_test,XO=XO,YO=YO)
 	logger.eval_test_performance()
 
 end = time.time()
