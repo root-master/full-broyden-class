@@ -381,7 +381,7 @@ class FullBroydenClass:
 			self.gamma = 1
 			return self.gamma
 
-		if self.find_gamma_L_BFGS_method == 'common':
+		if self.find_gamma_method == 'common':
 			gamma = self.find_gamma_common()
 			return gamma
 		
