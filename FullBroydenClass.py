@@ -229,8 +229,8 @@ class FullBroydenClass:
 		return
 	
 	def eval_reduction_ratio(self,p):
-		new_f = model.eval_aux_loss(p_vec=p)
-		old_f = model.eval_loss()
+		new_f = self.model.eval_aux_loss(p_vec=p)
+		old_f = self.model.eval_loss()
 
 		ared = old_f - new_f
 
