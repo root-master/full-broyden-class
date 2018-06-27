@@ -15,11 +15,11 @@ parser.add_argument(
         '--whole_gradient','-use-whole-data', action='store_true',default=False,
         help='Compute the gradient using all data')
 parser.add_argument(
-        '--use_overlap','-use-overlap', action='store_true',default=True,
+        '--use_overlap','-use-overlap', action='store_true',default=False,
         help='Compute y using overlap of multibatches')
 parser.add_argument('--max_iter', '-maxiter', default=200,help='max iterations')
 
-# python main.py -num-batch=10 -m=20 
+# python main.py -num-batch=10 -m=20 -use-overlap=False
 args = parser.parse_args()
 
 
