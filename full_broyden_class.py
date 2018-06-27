@@ -339,7 +339,7 @@ def form_Psi():
 	global Psi
 	Psi = np.concatenate( (gamma*S, Y) ,axis=1)
 
-def trust_region_subproblem_solver(delta, g):
+def trust_region_subproblem_solver(self,delta, g):
 	# size of w = g.size
 	n = sum(n_W.values())
 	form_Psi()

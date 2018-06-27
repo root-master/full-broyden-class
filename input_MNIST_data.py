@@ -123,6 +123,7 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
     data_sets = DataSets()
     if fake_data:
         data_sets.train = DataSet([], [], fake_data=True)
+        data_sets.train_all = DataSet([], [], fake_data=True)
         data_sets.validation = DataSet([], [], fake_data=True)
         data_sets.test = DataSet([], [], fake_data=True)
         return data_sets
@@ -133,7 +134,7 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
     TEST_LABELS = 't10k-labels-idx1-ubyte.gz'
     
     VALIDATION_SIZE = 10000
-    VALIDATIon_SPLIT_RATIO = 0.1
+    VALIDATION_SPLIT_RATIO = 0.1
     
     local_file = maybe_download(TRAIN_IMAGES, train_dir)
     train_images = extract_images(local_file)
@@ -147,9 +148,11 @@ def read_data_sets(train_dir, fake_data=False, one_hot=False):
     train_images = train_images - train_images.mean(0)
     test_images = test_images - test_images.mean(0)
 
+    data_sets.train_all = DataSet( train_images, train_labels )    
+    
     X_train, X_validation, y_train, y_validation = \
     train_test_split(train_images, train_labels, \
-        test_size=VALIDATIon_SPLIT_RATIO, random_state=42)
+        test_size=VALIDATION_SPLIT_RATIO, random_state=42)
     
     data_sets.train = DataSet(X_train, y_train)
     data_sets.validation = DataSet(X_validation, y_validation)
