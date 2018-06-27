@@ -148,7 +148,7 @@ class Model:
 		x_dict = {}
 		id_start = 0
 		id_end   = 0
-		for key in sorted(w_tf.keys()):
+		for key in sorted(self.w.keys()):
 			id_end = id_start + self.n_W[key]
 			vector = x_vec[id_start:id_end]
 			matrix = vector.reshape(self.weights_shape_dict[key])
