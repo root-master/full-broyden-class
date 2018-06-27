@@ -637,18 +637,20 @@ class FullBroydenClass:
 
 		self.iter += 1
 
+		if new_s.T @ new_y > 0:
+			self.update_S_Y(new_s,new_y)
+			self.update_M()
+		
 		if rho > eta:
 			self.model.update_weights(p_vec=p)
-			if new_s.T @ new_y > 0:
-				self.update_S_Y(new_s,new_y)
-				self.update_M()
+			print('weights updated')
 		else:
 			print('-'*30)
 			print('No update in this iteration')
 
 		# strategy_1
 		if rho < 1/4:
-			self.delta = 1/4 * self.delta
+			self.delta = 1/2 * self.delta
 			print('shrinking trust region radius')
 		else:
 			if rho > 3/4 and isclose( norm(p), self.delta ):
